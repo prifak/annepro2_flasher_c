@@ -41,7 +41,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
     }
     hid_free_enumeration(devices);
 
-    // Ожидание устройства
+    // Device waiting
     if (!handle) {
         printf("Please put your keyboard into IAP mode (hold ESC while plugging it in).\n");
         for (int i = 10; i > 0; i--) {
@@ -67,7 +67,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         return NoDeviceFound;
     }
 
-    // Стирание
+    // Erasing
     uint8_t erase_cmd[6] = {
         0x02, 0x43,
         base & 0xFF, (base >> 8) & 0xFF,
@@ -79,7 +79,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         return EraseError;
     }
 
-    // Получение размера прошивки
+    // Get firmware size
     fseek(file, 0, SEEK_END);
     size_t total_size = ftell(file);
     rewind(file);
@@ -123,7 +123,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
 
     printf("\nFlash complete: %zu bytes written in %lds.\n", total_written, time(NULL) - start);
 
-    // Установка AP-флага
+    // Set AP FLAG
     uint8_t ap_flag_cmd[3] = {0x02, 0x32, 0x02};
     if (write_to_target(handle, McuMain, ap_flag_cmd, sizeof(ap_flag_cmd)) < 0) {
         fprintf(stderr, "Error writing AP flag.\n");
@@ -132,20 +132,8 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
     }
 
 
-    // Рестарт устройства, если нужно
+    // Device restart
     if (boot) {
-        /*
-        uint8_t boot_cmd[] = {
-            0x00, 0x7b, 0x10, 0x31,
-            0x10, 0x03, 0x00, 0x00,
-            0x7d, 0x02, 0x01, 0x02
-        };
-        if (hid_write(handle, boot_cmd, sizeof(boot_cmd)) < 0) {
-            fprintf(stderr, "Error booting device.\n");
-            hid_close(handle);
-            return FlashError;
-        }
-        */
         uint8_t boot_cmd[] = {
             0x00, 0x7b, 0x10, 0x31,
             0x10, 0x03, 0x00, 0x00,
