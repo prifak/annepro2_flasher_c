@@ -41,7 +41,7 @@ pkgs.mkShell {
   1. Install dependencies
   2. Do this in your terminal
 
-    git clone https://github.com/YOUR_USERNAME/annepro2-tools-c.git
+    git clone https://github.com/prifak/annepro2-tools-c.git
     cd annepro2-tools-c
     make
     sudo make install
