@@ -10,7 +10,7 @@ OUT = $(BIN_DIR)/annepro2_flasher_c
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
 
-PREFIX ?= /usr/local
+PREFIX ?= /usr
 BINDIR = $(PREFIX)/bin
 
 all: $(BIN_DIR) $(BUILD_DIR) $(OUT)
