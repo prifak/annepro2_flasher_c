@@ -35,8 +35,14 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
     for (dev = devices; dev; dev = dev->next) {
         if ((dev->product_id == PID_C15 && dev->interface_number == 1) ||
             dev->product_id == PID_C18) {
+
             handle = hid_open_path(dev->path);
-        break;
+        if (!handle) {
+            fprintf(stderr, "Error: Device found, but permission denied. Run as root or check udev rules.\n");
+            hid_free_enumeration(devices);
+            return USBError; // Сразу выходим!
+        }
+        break; // Успешно открыли
             }
     }
     hid_free_enumeration(devices);
@@ -50,8 +56,14 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
             for (dev = devices; dev; dev = dev->next) {
                 if ((dev->product_id == PID_C15 && dev->interface_number == 1) ||
                     dev->product_id == PID_C18) {
+
                     handle = hid_open_path(dev->path);
-                break;
+                if (!handle) {
+                    fprintf(stderr, "Error: Device found, but permission denied. Run as root or check udev rules.\n");
+                    hid_free_enumeration(devices);
+                    return USBError; // Сразу выходим!
+                }
+                break; // Успешно открыли
                     }
             }
             hid_free_enumeration(devices);
@@ -79,33 +91,76 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         return EraseError;
     }
 
-    // Get firmware size
-    fseek(file, 0, SEEK_END);
-    size_t total_size = ftell(file);
+    if (write_to_target(handle, target, erase_cmd, sizeof(erase_cmd)) < 0) {
+        fprintf(stderr, "Error erasing device memory.\n");
+        hid_close(handle);
+        return EraseError;
+    }
+
+    // ==========================================
+    // НАЧАЛО ШАГА 4: Загрузка прошивки в ОЗУ
+    // ==========================================
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fprintf(stderr, "Error: Cannot seek file. Is it a regular file?\n");
+        hid_close(handle);
+        return FlashError;
+    }
+
+    long size = ftell(file);
+    if (size <= 0) {
+        fprintf(stderr, "Error: Firmware file is empty or invalid.\n");
+        hid_close(handle);
+        return FlashError;
+    }
+    size_t total_size = (size_t)size;
     rewind(file);
 
-    uint8_t chunk[48];
-    size_t read_size;
+    uint8_t *file_buffer = malloc(total_size);
+    if (!file_buffer) {
+        fprintf(stderr, "Error: Failed to allocate memory for firmware.\n");
+        hid_close(handle);
+        return OtherError;
+    }
+
+    if (fread(file_buffer, 1, total_size, file) != total_size) {
+        fprintf(stderr, "Error: Failed to read file into memory.\n");
+        free(file_buffer);
+        hid_close(handle);
+        return FlashError;
+    }
+    // ==========================================
+    // КОНЕЦ ШАГА 4
+    // ==========================================
+
+
+    // ==========================================
+    // НАЧАЛО ШАГА 5: Прошивка прямо из буфера в ОЗУ
+    // ==========================================
     uint32_t current_addr = base;
     size_t total_written = 0;
     time_t start = time(NULL);
 
-    while ((read_size = fread(chunk, 1, sizeof(chunk), file)) > 0) {
+    while (total_written < total_size) {
+        size_t chunk_size = (total_size - total_written > 48) ? 48 : (total_size - total_written);
+
         uint8_t flash_cmd[6 + 48] = {
             0x02, 0x31,
             current_addr & 0xFF, (current_addr >> 8) & 0xFF,
             (current_addr >> 16) & 0xFF, (current_addr >> 24) & 0xFF
         };
-        memcpy(flash_cmd + 6, chunk, read_size);
 
-        if (write_to_target(handle, target, flash_cmd, 6 + read_size) < 0) {
+        // Берем данные из массива file_buffer, а не с диска
+        memcpy(flash_cmd + 6, file_buffer + total_written, chunk_size);
+
+        if (write_to_target(handle, target, flash_cmd, 6 + chunk_size) < 0) {
             fprintf(stderr, "\nError flashing memory at address 0x%08x.\n", current_addr);
+            free(file_buffer); // Очищаем память перед выходом с ошибкой
             hid_close(handle);
             return FlashError;
         }
 
-        total_written += read_size;
-        current_addr += read_size;
+        total_written += chunk_size;
+        current_addr += chunk_size;
 
         float percent = (float)total_written / total_size;
         int bars = (int)(percent * 30);
@@ -121,7 +176,16 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         fflush(stdout);
     }
 
+    // Прошивка завершена успешно, освобождаем память
+    free(file_buffer);
+
     printf("\nFlash complete: %zu bytes written in %lds.\n", total_written, time(NULL) - start);
+    // ==========================================
+    // КОНЕЦ ШАГА 5
+    // ==========================================
+
+
+    // --- Оставшаяся часть функции остается без изменений ---
 
     // Set AP FLAG
     uint8_t ap_flag_cmd[3] = {0x02, 0x32, 0x02};
@@ -130,7 +194,6 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         hid_close(handle);
         return FlashError;
     }
-
 
     // Device restart
     if (boot) {
@@ -151,6 +214,11 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
 }
 
 static int write_to_target(hid_device *handle, AP2Target target, const uint8_t *payload, size_t payload_len) {
+    // Размер пакета 64 байта - 9 байт заголовка = 55 байт максимум
+    if (payload_len > 55) {
+        fprintf(stderr, "CRITICAL: payload_len (%zu) exceeds HID packet size!\n", payload_len);
+        return -1;
+    }
     uint8_t buffer[64] = {0};
     buffer[1] = 0x7b;
     buffer[2] = 0x10;
