@@ -5,10 +5,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Тот самый костыль, который уберет красную ошибку:
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
-# Качаем кроссплатформенный hidapi прямо из исходников
 include(FetchContent)
 FetchContent_Declare(
     hidapi
@@ -17,11 +15,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(hidapi)
 
-# Собираем вашу консольную утилиту
+# making
 add_executable(annepro2_flasher
     src/main.c
     src/annepro2.c
 )
 
-# Подключаем библиотеку hidraw (для Линукса)
-target_link_libraries(annepro2_flasher PRIVATE hidapi_hidraw)
+# set sources directory
+target_include_directories(annepro2_flasher PRIVATE ${hidapi_SOURCE_DIR}/hidapi)
+
+# cross-platform usb linking
+if (WIN32)
+    target_link_libraries(annepro2_flasher PRIVATE hidapi_winapi)
+elseif (APPLE)
+    target_link_libraries(annepro2_flasher PRIVATE hidapi_darwin)
+    find_library(IOKIT_LIBRARY IOKit REQUIRED)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation REQUIRED)
+    target_link_libraries(annepro2_flasher PRIVATE ${IOKIT_LIBRARY} ${COREFOUNDATION_LIBRARY})
+else ()
+    # for linux
+    target_link_libraries(annepro2_flasher PRIVATE hidapi_hidraw)
+endif()
