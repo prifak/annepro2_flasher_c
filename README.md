@@ -14,8 +14,6 @@ Check the [Releases](https://github.com/prifak/annepro2-tools-c/releases) page o
 
 ## Build Instructions (From Source)
 
-Since the project uses modern CMake, it automatically downloads and builds the required `hidapi` library from source. You don't need to hunt for pre-compiled `hidapi` packages anymore.
-
 ### Prerequisites
 
 * **All platforms:** `cmake` (version 3.14+) and a C compiler (`gcc`, `clang`, or MSVC).
