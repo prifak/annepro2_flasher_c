@@ -1,75 +1,77 @@
 # annepro2_flasher_c
-This is cli utility for flash annepro2 keyboard, rewriten from existing one (from Rust to clear C)
+
+This is a lightweight CLI utility to flash the Anne Pro 2 keyboard. 
+Originally rewritten from Rust to clean, dependency-free C. Now fully cross-platform (Windows, macOS, Linux) powered by CMake.
 
 ---
 
-## Dependencies
+## Download Pre-built Binaries
 
-To build this project externally, you only need **hidapi** — specifically the *hidapi-hidraw* variant (header files and linkable library).
+You don't need to build this from source! Ready-to-use binaries for **Windows, macOS, and Linux** are automatically generated.
+Check the [Releases](https://github.com/prifak/annepro2-tools-c/releases) page or the GitHub Actions tab to download the latest `.exe` or executable for your system.
 
-> Note:  
-> - In most cases, `hidapi-hidraw` is used by default.  
-> - If you specifically need `hidapi-libusb`, package names may differ.  
-> - On Debian 11+ and Ubuntu 20.04+, `libhidapi-dev` defaults to `hidraw`.
+---
 
-### Installing `hidapi` development package
+## Build Instructions (From Source)
 
-| Distribution         | Install Command                                                                 |
-|----------------------|----------------------------------------------------------------------------------|
-| **Debian/Ubuntu**    | `sudo apt install libhidapi-dev`                                                |
-| **Fedora**           | `sudo dnf install hidapi-devel`                                                 |
-| **CentOS/RHEL**      | `sudo yum install hidapi-devel`                                                 |
-| **Arch Linux/Manjaro** | `sudo pacman -S hidapi`                                                       |
-| **Gentoo**           | `sudo emerge dev-libs/hidapi`                                                   |
-| **Void Linux**       | `sudo xbps-install -S libhidapi-devel`                                          |
-| **Nix/NixOS**        | `nix-shell -p hidapi` *(or add `hidapi` to `buildInputs`)*                      |
-| **Alpine Linux**     | `sudo apk add hidapi-dev`                                                       |
-| **Slackware**        | via SlackBuilds or sbopkg: `sbopkg -i hidapi`                                   |
+Since the project uses modern CMake, it automatically downloads and builds the required `hidapi` library from source. You don't need to hunt for pre-compiled `hidapi` packages anymore.
 
-<details>
-<summary>Example `shell.nix` for Nix/NixOS</summary>
+### Prerequisites
 
-```nix
-{ pkgs ? import <nixpkgs> {} }:
-pkgs.mkShell {
-  buildInputs = [ pkgs.hidapi ];
-}
-```
-</details>
+* **All platforms:** `cmake` (version 3.14+) and a C compiler (`gcc`, `clang`, or MSVC).
+* **Linux only:** You need `pkg-config` and `libudev-dev` to compile the USB backend.
+  * *Ubuntu/Debian:* `sudo apt install cmake gcc pkg-config libudev-dev`
+  * *Arch/Manjaro:* `sudo pacman -S cmake gcc pkgconf systemd`
+  * *Fedora:* `sudo dnf install cmake gcc pkgconf-pkg-config systemd-devel`
 
-## Build instructions
-  1. Install dependencies
-  2. Do this in your terminal
+### Building
 
-    git clone https://github.com/prifak/annepro2-tools-c.git
-    cd annepro2-tools-c
-    make
-    sudo make install
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/prifak/annepro2-tools-c.git](https://github.com/prifak/annepro2-tools-c.git)
+   cd annepro2-tools-c
+   ```
 
-## Usage 
-To flash firmware:
+2. Configure the project and generate build files:
+   ```bash
+   cmake -B build -DCMAKE_BUILD_TYPE=Release
+   ```
+
+3. Compile the code:
+   ```bash
+   cmake --build build --config Release
+   ```
+
+The compiled executable will be located inside the build/ directory (e.g., build/annepro2_flasher or build/bin/annepro2_flasher depending on your CMake configuration).
+
+## Usage
+You can run the executable directly from the build folder. If run without arguments, the tool displays a help message with all available options.
+
+    Important: The tool will wait up to 10 seconds for the keyboard to enter IAP (flash) mode.
+    To do this: unplug the keyboard, hold the ESC key, then plug it back in.
+
+### To flash main firmware:
+  ```bash
+  ./build/annepro2_flasher ./my_firmware.bin
+  ```
+
+
+### To flash the LED Processor:
+  ```bash
+  ./build/annepro2_flasher -t led ./my_led_firmware.bin
+  ```
+
+
+### To flash the Bluetooth (BLE) firmware:
+  ```bash
+  ./build/annepro2_flasher -t ble ./my_ble_firmware.bin
+  ```
+
+### Auto-reboot
+If you want the keyboard to automatically reboot after a successful flash, just add the --boot flag:
 ```bash
-annepro2_flasher_c ./my_firmware.bin
+./build/annepro2_flasher --boot ./my_firmware.bin
 ```
 
-To flash light processor:
-```bash
-annepro2_flasher_c -t led ./my_led_firmware.bin
-```
-
-To flash bluetooth firmware:
-```bash
-annepro2_flasher_c -t ble ./my_ble_firmware.bin
-```
-If you want auto reboot keyboard after flash just add ```--boot``` parameter:
-```bash
-annepro2_flasher_c --boot ./my_firmware.bin
-```
-If run without arguments, the tool displays a help message with all available options.
-
-> The tool will wait up to 10 seconds for the keyboard to enter IAP mode.
-> To do this: unplug the keyboard, hold ESC, then plug it back in.
-
-## P.S.
-  I am not responsible for broken keyboards. Use this program at your own risk.
-    
+## Disclaimer
+I am not responsible for bricked or broken keyboards. Use this program at your own risk.
