@@ -30,7 +30,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
     hid_device *handle = NULL;
     struct hid_device_info *devices = NULL, *dev = NULL;
 
-    // Первый поиск
+    // First search
     devices = hid_enumerate(ANNEPRO2_VID, 0);
     for (dev = devices; dev; dev = dev->next) {
         if ((dev->product_id == PID_C15 && dev->interface_number == 1) ||
@@ -40,9 +40,9 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         if (!handle) {
             fprintf(stderr, "Error: Device found, but permission denied. Run as root or check udev rules.\n");
             hid_free_enumeration(devices);
-            return USBError; // Сразу выходим!
+            return USBError;
         }
-        break; // Успешно открыли
+        break;
             }
     }
     hid_free_enumeration(devices);
@@ -61,9 +61,9 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
                 if (!handle) {
                     fprintf(stderr, "Error: Device found, but permission denied. Run as root or check udev rules.\n");
                     hid_free_enumeration(devices);
-                    return USBError; // Сразу выходим!
+                    return USBError;
                 }
-                break; // Успешно открыли
+                break;
                     }
             }
             hid_free_enumeration(devices);
@@ -97,9 +97,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         return EraseError;
     }
 
-    // ==========================================
-    // НАЧАЛО ШАГА 4: Загрузка прошивки в ОЗУ
-    // ==========================================
+    // Loading to RAM
     if (fseek(file, 0, SEEK_END) != 0) {
         fprintf(stderr, "Error: Cannot seek file. Is it a regular file?\n");
         hid_close(handle);
@@ -128,14 +126,8 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         hid_close(handle);
         return FlashError;
     }
-    // ==========================================
-    // КОНЕЦ ШАГА 4
-    // ==========================================
 
-
-    // ==========================================
-    // НАЧАЛО ШАГА 5: Прошивка прямо из буфера в ОЗУ
-    // ==========================================
+    // flash from RAM (eliminate disk reads
     uint32_t current_addr = base;
     size_t total_written = 0;
     time_t start = time(NULL);
@@ -149,12 +141,11 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
             (current_addr >> 16) & 0xFF, (current_addr >> 24) & 0xFF
         };
 
-        // Берем данные из массива file_buffer, а не с диска
         memcpy(flash_cmd + 6, file_buffer + total_written, chunk_size);
 
         if (write_to_target(handle, target, flash_cmd, 6 + chunk_size) < 0) {
             fprintf(stderr, "\nError flashing memory at address 0x%08x.\n", current_addr);
-            free(file_buffer); // Очищаем память перед выходом с ошибкой
+            free(file_buffer); 
             hid_close(handle);
             return FlashError;
         }
@@ -176,17 +167,10 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
         fflush(stdout);
     }
 
-    // Прошивка завершена успешно, освобождаем память
     free(file_buffer);
 
     printf("\nFlash complete: %zu bytes written in %lds.\n", total_written, time(NULL) - start);
-    // ==========================================
-    // КОНЕЦ ШАГА 5
-    // ==========================================
-
-
-    // --- Оставшаяся часть функции остается без изменений ---
-
+    
     // Set AP FLAG
     uint8_t ap_flag_cmd[3] = {0x02, 0x32, 0x02};
     if (write_to_target(handle, McuMain, ap_flag_cmd, sizeof(ap_flag_cmd)) < 0) {
@@ -214,7 +198,7 @@ int flash_firmware(AP2Target target, uint32_t base, FILE *file, int boot) {
 }
 
 static int write_to_target(hid_device *handle, AP2Target target, const uint8_t *payload, size_t payload_len) {
-    // Размер пакета 64 байта - 9 байт заголовка = 55 байт максимум
+    // file size - 55 bytes
     if (payload_len > 55) {
         fprintf(stderr, "CRITICAL: payload_len (%zu) exceeds HID packet size!\n", payload_len);
         return -1;
