@@ -1,9 +1,14 @@
-// main.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include "annepro2.h"
+
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#else
+#include <strings.h>
+#endif
 
 uint32_t parse_hex(const char *str) {
     char *endptr;
