@@ -1,10 +1,16 @@
 #include "annepro2.h"
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#define sleep(x) Sleep(1000 * (x))
+#else
+#include <unistd.h>
+#endif
 
 #define ANNEPRO2_VID 0x04d9
 #define PID_C15 0x8008
